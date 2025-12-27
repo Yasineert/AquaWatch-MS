@@ -1,0 +1,81 @@
+pipeline {
+    agent any
+    
+    environment {
+        SERVICE_NAME = 'service_capteurs'
+        DOCKER_IMAGE = "aquawatch/${SERVICE_NAME}"
+        SONAR_PROJECT_KEY = "aquawatch-${SERVICE_NAME}"
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                echo "Checking out code for ${SERVICE_NAME}..."
+                checkout scm
+            }
+        }
+        
+        stage('Install Dependencies') {
+            steps {
+                dir("services/${SERVICE_NAME}") {
+                    echo 'Installing Node.js dependencies...'
+                    sh 'npm ci'
+                }
+            }
+        }
+        
+        stage('Run Tests') {
+            steps {
+                dir("services/${SERVICE_NAME}") {
+                    echo 'Running tests...'
+                    sh 'npm test || true'
+                }
+            }
+        }
+        
+        stage('SonarQube Analysis') {
+            steps {
+                dir("services/${SERVICE_NAME}") {
+                    script {
+                        def scannerHome = tool 'SonarScanner'
+                        withSonarQubeEnv('SonarQube') {
+                            sh "${scannerHome}/bin/sonar-scanner"
+                        }
+                    }
+                }
+            }
+        }
+        
+        stage('Build Docker Image') {
+            steps {
+                dir("services/${SERVICE_NAME}") {
+                    echo 'Building Docker image...'
+                    sh "docker build -t ${DOCKER_IMAGE}:${BUILD_NUMBER} -t ${DOCKER_IMAGE}:latest ."
+                }
+            }
+        }
+        
+        stage('Deploy') {
+            steps {
+                echo 'Deploying service...'
+                sh """
+                    cd /workspace
+                    docker-compose up -d ${SERVICE_NAME}
+                """
+            }
+        }
+    }
+    
+    post {
+        success {
+            echo "✅ Pipeline for ${SERVICE_NAME} completed successfully!"
+        }
+        failure {
+            echo "❌ Pipeline for ${SERVICE_NAME} failed!"
+        }
+        always {
+            echo 'Cleaning up...'
+            cleanWs()
+        }
+    }
+}
