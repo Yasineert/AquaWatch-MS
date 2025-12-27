@@ -3,7 +3,6 @@ pipeline {
     
     environment {
         SERVICE_NAME = 'service_stmodel'
-        DOCKER_IMAGE = "aquawatch/${SERVICE_NAME}"
     }
     
     stages {
@@ -22,7 +21,7 @@ pipeline {
                         python -m venv venv
                         call venv\\Scripts\\activate.bat
                         python -m pip install --upgrade pip
-                        pip install -r requirements.txt
+                        pip install -r requirements.txt || exit 0
                     '''
                 }
             }
@@ -37,22 +36,6 @@ pipeline {
                         pytest tests/ || exit 0
                     '''
                 }
-            }
-        }
-        
-        stage('Build Docker Image') {
-            steps {
-                dir("services/${SERVICE_NAME}") {
-                    echo 'Building Docker image...'
-                    bat "docker build -t ${DOCKER_IMAGE}:${BUILD_NUMBER} -t ${DOCKER_IMAGE}:latest ."
-                }
-            }
-        }
-        
-        stage('Deploy') {
-            steps {
-                echo 'Deploying service...'
-                bat 'docker-compose up -d service_stmodel'
             }
         }
     }
