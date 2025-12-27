@@ -15,7 +15,7 @@ pipeline {
         
         stage('Install Dependencies') {
             steps {
-                dir("services/${SERVICE_NAME}") {
+                dir("services/${SERVICE_NAME}/program") {
                     echo 'Installing Node.js dependencies...'
                     bat 'npm install'
                 }
@@ -24,7 +24,7 @@ pipeline {
         
         stage('Build Next.js') {
             steps {
-                dir("services/${SERVICE_NAME}") {
+                dir("services/${SERVICE_NAME}/program") {
                     echo 'Building Next.js application...'
                     bat 'npm run build || exit 0'
                 }
@@ -33,7 +33,7 @@ pipeline {
         
         stage('Run Tests') {
             steps {
-                dir("services/${SERVICE_NAME}") {
+                dir("services/${SERVICE_NAME}/program") {
                     echo 'Running tests...'
                     bat 'npm test || exit 0'
                 }
