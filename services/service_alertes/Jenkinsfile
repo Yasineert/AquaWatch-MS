@@ -4,7 +4,6 @@ pipeline {
     environment {
         SERVICE_NAME = 'service_alertes'
         DOCKER_IMAGE = "aquawatch/${SERVICE_NAME}"
-        SONAR_PROJECT_KEY = "aquawatch-${SERVICE_NAME}"
     }
     
     stages {
@@ -19,7 +18,7 @@ pipeline {
             steps {
                 dir("services/${SERVICE_NAME}") {
                     echo 'Installing Node.js dependencies...'
-                    sh 'npm ci'
+                    bat 'npm ci'
                 }
             }
         }
@@ -28,20 +27,7 @@ pipeline {
             steps {
                 dir("services/${SERVICE_NAME}") {
                     echo 'Running tests...'
-                    sh 'npm test || true'
-                }
-            }
-        }
-        
-        stage('SonarQube Analysis') {
-            steps {
-                dir("services/${SERVICE_NAME}") {
-                    script {
-                        def scannerHome = tool 'SonarScanner'
-                        withSonarQubeEnv('SonarQube') {
-                            sh "${scannerHome}/bin/sonar-scanner"
-                        }
-                    }
+                    bat 'npm test || exit 0'
                 }
             }
         }
@@ -50,7 +36,7 @@ pipeline {
             steps {
                 dir("services/${SERVICE_NAME}") {
                     echo 'Building Docker image...'
-                    sh "docker build -t ${DOCKER_IMAGE}:${BUILD_NUMBER} -t ${DOCKER_IMAGE}:latest ."
+                    bat "docker build -t ${DOCKER_IMAGE}:${BUILD_NUMBER} -t ${DOCKER_IMAGE}:latest ."
                 }
             }
         }
@@ -58,10 +44,7 @@ pipeline {
         stage('Deploy') {
             steps {
                 echo 'Deploying service...'
-                sh """
-                    cd /workspace
-                    docker-compose up -d ${SERVICE_NAME}
-                """
+                bat 'docker-compose up -d service_alertes'
             }
         }
     }

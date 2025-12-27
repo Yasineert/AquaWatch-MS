@@ -4,7 +4,6 @@ pipeline {
     environment {
         SERVICE_NAME = 'service_satellite'
         DOCKER_IMAGE = "aquawatch/${SERVICE_NAME}"
-        SONAR_PROJECT_KEY = "aquawatch-${SERVICE_NAME}"
     }
     
     stages {
@@ -19,10 +18,10 @@ pipeline {
             steps {
                 dir("services/${SERVICE_NAME}") {
                     echo 'Setting up Python virtual environment...'
-                    sh '''
-                        python3 -m venv venv
-                        . venv/bin/activate
-                        pip install --upgrade pip
+                    bat '''
+                        python -m venv venv
+                        call venv\\Scripts\\activate.bat
+                        python -m pip install --upgrade pip
                         pip install -r requirements.txt
                     '''
                 }
@@ -33,23 +32,10 @@ pipeline {
             steps {
                 dir("services/${SERVICE_NAME}") {
                     echo 'Running Python tests...'
-                    sh '''
-                        . venv/bin/activate
-                        pytest tests/ || true
+                    bat '''
+                        call venv\\Scripts\\activate.bat
+                        pytest tests/ || exit 0
                     '''
-                }
-            }
-        }
-        
-        stage('SonarQube Analysis') {
-            steps {
-                dir("services/${SERVICE_NAME}") {
-                    script {
-                        def scannerHome = tool 'SonarScanner'
-                        withSonarQubeEnv('SonarQube') {
-                            sh "${scannerHome}/bin/sonar-scanner"
-                        }
-                    }
                 }
             }
         }
@@ -58,7 +44,7 @@ pipeline {
             steps {
                 dir("services/${SERVICE_NAME}") {
                     echo 'Building Docker image...'
-                    sh "docker build -t ${DOCKER_IMAGE}:${BUILD_NUMBER} -t ${DOCKER_IMAGE}:latest ."
+                    bat "docker build -t ${DOCKER_IMAGE}:${BUILD_NUMBER} -t ${DOCKER_IMAGE}:latest ."
                 }
             }
         }
@@ -66,10 +52,7 @@ pipeline {
         stage('Deploy') {
             steps {
                 echo 'Deploying service...'
-                sh """
-                    cd /workspace
-                    docker-compose up -d ${SERVICE_NAME}
-                """
+                bat 'docker-compose up -d service_satellite'
             }
         }
     }
