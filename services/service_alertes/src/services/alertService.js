@@ -15,8 +15,8 @@ class AlertService {
                 pass: process.env.SMTP_PASSWORD
             },
             tls: {
-                // Disable certificate validation for Docker/Windows environments
-                rejectUnauthorized: false
+                // Certificates are validated unless explicitly disabled for local debugging
+                rejectUnauthorized: process.env.SMTP_TLS_INSECURE !== 'true'
             }
         });
     }
