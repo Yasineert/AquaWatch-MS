@@ -1,304 +1,97 @@
-# 🌊 AquaWatch-MS - Qualité de l'eau en temps réel
+# AquaWatch-MS — Real-time Water Quality Monitoring
 
-**Plateforme modulaire de surveillance et prédiction de la qualité de l'eau basée sur des microservices**
+[![CI](https://github.com/Yasineert/AquaWatch-MS/actions/workflows/ci.yml/badge.svg)](https://github.com/Yasineert/AquaWatch-MS/actions/workflows/ci.yml)
+![Microservices](https://img.shields.io/badge/architecture-microservices-0A66C2)
+![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
+![License](https://img.shields.io/badge/license-MIT-blue)
 
-![AquaWatch](https://img.shields.io/badge/AquaWatch-MS-blue?style=for-the-badge)
-![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=for-the-badge&logo=docker)
-![Node.js](https://img.shields.io/badge/Node.js-43853D?style=for-the-badge&logo=node.js&logoColor=white)
-![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
+Microservice platform that monitors water quality from IoT sensors and Sentinel-2 satellite data, predicts short-term changes with a spatio-temporal model, raises alerts when WHO thresholds are exceeded and shows the situation on an interactive map.
 
----
+## Architecture
 
-## 🎯 OBJECTIF
+```
+ IoT sensors ──MQTT──▶ service_capteurs ──┐
+                       (Node.js, 8001)    │
+ Sentinel-2 / ──────▶ service_satellite ──┼──▶ service_stmodel ──▶ service_alertes ──▶ e-mail
+ Copernicus            (Python, 8002)     │    (Python ML, 8003)    (Node.js, 8004)
+                                          │            │
+                                          ▼            ▼
+                     TimescaleDB · PostGIS · MongoDB · MinIO · Redis
+                                          │
+                                          ▼
+                                 service_api_sig (Next.js, 8005)
+                                 map, dashboards, reports
+```
 
-Développer une plateforme automatisée pour :
-- 📊 **Surveiller** la qualité de l'eau en temps réel via capteurs IoT et données satellites
-- 🔮 **Prédire** les variations à court terme avec des modèles spatio-temporels  
-- 🚨 **Alerter** automatiquement en cas de dépassement des seuils OMS
-- 🗺️ **Visualiser** l'état des masses d'eau sur interface cartographique
+| Service | Role | Stack | Port |
+|---|---|---|---|
+| `service_capteurs` | Collects sensor readings (pH, turbidity, temperature) over MQTT, REST API | Node.js, Express, TimescaleDB | 8001 |
+| `service_satellite` | Downloads and processes Sentinel-2 imagery (NDWI, chlorophyll) | Python, FastAPI, MinIO | 8002 |
+| `service_stmodel` | Spatio-temporal prediction model and prediction API | Python, PyTorch, Redis | 8003 |
+| `service_alertes` | Threshold monitoring, alert lifecycle, e-mail notifications | Node.js, Express, PostgreSQL | 8004 |
+| `service_api_sig` | Web app: interactive map, sensors, predictions, alerts, reports | Next.js, TypeScript, PostGIS, GeoServer | 8005 |
 
----
+Supporting infrastructure: TimescaleDB, PostGIS, MongoDB, MinIO, Redis, GeoServer, SonarQube and Jenkins, all defined in `docker-compose.yml`.
 
-## 🏗️ ARCHITECTURE MICROSERVICES
+## Monitored parameters
 
-### **👥 Équipe & Services**
-| **Développeur** | **Services** | **Technologies** | **Port** |
-|----------------|-------------|------------------|----------|
-| **Hamza** | STModel + Infrastructure | Python, ML, Docker | 8003 |
-| **Bilal** | Capteurs + Satellite | Node.js, Python, MQTT | 8001, 8002 |
-| **Yassin** | Alertes + API-SIG | Node.js, PostGIS | 8004, 8005 |
+| Parameter | WHO threshold | Source |
+|---|---|---|
+| pH | 6.5 – 8.5 | Sensors |
+| Turbidity | < 4.0 NTU | Sensors, satellite |
+| Temperature | < 25 °C | Sensors |
+| Chlorophyll | variable | Satellite |
+| NDWI | 0.0 – 1.0 | Satellite |
 
-### **🔧 Services détaillés**
+## Getting started
 
-#### 🌡️ **Service Capteurs** (Port 8001)
-> **Responsable : Bilal**
-- Collecte données IoT temps réel (pH, turbidité, température)
-- Passerelle MQTT + API REST
-- Stockage TimescaleDB pour séries temporelles
+**Requirements:** Docker Desktop with Compose, Git. Node.js 20 and Python 3.12 only to run services outside Docker.
 
-#### 🛰️ **Service Satellite** (Port 8002)  
-> **Responsable : Bilal**
-- Intégration Sentinel-2, Copernicus
-- Traitement images GDAL/rasterio
-- Extraction variables dérivées (chlorophylle, NDWI)
-
-#### 🧠 **Service STModel** (Port 8003)
-> **Responsable : Hamza** 
-- Modèles prédictifs ConvLSTM (PyTorch)
-- Prédictions spatio-temporelles 24h/72h
-- API ML pour qualité eau
-
-#### 🚨 **Service Alertes** (Port 8004)
-> **Responsable : Yassin**
-- Surveillance seuils OMS automatique
-- Notifications email/SMS/webhooks
-- Dashboard monitoring temps réel
-
-#### 🗺️ **Service API-SIG** (Port 8005)
-> **Responsable : Yassin**
-- Interface cartographique interactive
-- API REST/GeoJSON avec PostGIS
-- Visualisation zones risques
-
----
-
-## 🚀 DÉMARRAGE RAPIDE
-
-### **1. Prérequis**
 ```bash
-# Installer Docker Desktop + Git + Node.js + Python 3.12
-# Démarrer Docker Desktop (OBLIGATOIRE)
-```
-
-### **2. Clone et configuration**
-```powershell
-git clone https://github.com/Hamza-Aglagal/AquaWatch-MS.git
+git clone https://github.com/Yasineert/AquaWatch-MS.git
 cd AquaWatch-MS
-git checkout development
 
-# Configuration environnement
-copy .env.template .env
-# Modifier .env selon vos besoins
+cp .env.example .env
+cp .env.alertes.example .env.alertes
+cp .env.api_sig.example .env.api_sig
+# edit the three files with your own credentials
+
+docker compose up --build -d
 ```
 
-### **3. Lancement infrastructure**
-```powershell
-# Infrastructure commune (base données + stockage)
-docker compose up db_timescale minio_storage -d
+| Endpoint | URL |
+|---|---|
+| Sensors API | http://localhost:8001/api |
+| Satellite API | http://localhost:8002/api |
+| Prediction API | http://localhost:8003/api |
+| Alerts API | http://localhost:8004/api |
+| Web app (map) | http://localhost:8005/map |
+| MinIO console | http://localhost:9001 |
 
-# Test build complet
-docker compose build
+## Tests and quality
 
-# Lancement tous services
-docker compose up
+```bash
+cd services/service_alertes && npm install && npx jest tests/alertService
 ```
 
-### **4. Vérification**
-- 🔗 Capteurs API: http://localhost:8001/api
-- 🔗 Satellite API: http://localhost:8002/api  
-- 🔗 STModel API: http://localhost:8003/api
-- 🔗 Alertes API: http://localhost:8004/api
-- 🔗 Carte interactive: http://localhost:8005/map
-- 🔗 Console MinIO: http://localhost:9001
+- Unit tests for the alert service: identifier and default severity, alert payload, delivery status (`pending`, `sent`, `failed`) and error propagation, with the database and SMTP mocked.
+- GitHub Actions runs the unit tests and a Gitleaks secret scan on every push.
+- SonarCloud analyses code quality (`.github/workflows/sonarcloud.yml`); Jenkins pipelines are provided per service.
 
----
+## Security
 
-## 📚 GUIDES DÉVELOPPEUR
+- All credentials come from Git-ignored `.env` files; only `*.example` templates are versioned.
+- SMTP connections validate TLS certificates (`SMTP_TLS_INSECURE=true` only for local debugging).
+- See [SECURITY.md](SECURITY.md) to report a vulnerability.
 
-### **📖 Guides spécialisés par personne**
-- 📋 [**GUIDE_HAMZA.md**](./GUIDE_HAMZA.md) - STModel + Infrastructure
-- 📋 [**GUIDE_BILAL.md**](./GUIDE_BILAL.md) - Capteurs + Satellite  
-- 📋 [**GUIDE_YASSIN.md**](./GUIDE_YASSIN.md) - Alertes + API-SIG
+## Team
 
-### **📖 Guide général**
-- 📋 [**WORKFLOW_GENERAL.md**](./WORKFLOW_GENERAL.md) - Git/Docker pour tous
+| Member | Scope |
+|---|---|
+| Hamza Aglagal | Prediction model, infrastructure |
+| Bilal | Sensors and satellite services |
+| Yassin | Alert service, GIS API and web app |
 
----
+## License
 
-## 🔧 TECHNOLOGIES
-
-### **Backend**
-- **Node.js** + Express.js (Services Capteurs, Alertes, API-SIG)
-- **Python** + FastAPI (Services Satellite, STModel)
-- **TimescaleDB** (Séries temporelles)
-- **PostgreSQL** + PostGIS (Données géospatiales)
-- **MinIO** (Stockage fichiers satellites)
-
-### **Frontend**
-- **Leaflet.js** (Cartes interactives)
-- **Chart.js** (Graphiques données)
-- **WebSockets** (Temps réel)
-
-### **Machine Learning**
-- **PyTorch** / **TensorFlow** (Modèles prédictifs)
-- **Scikit-learn** (ML classique)
-- **GDAL** + **Rasterio** (Traitement géospatial)
-
-### **DevOps**
-- **Docker** + **Docker Compose**
-- **Git** (Workflow GitFlow)
-- **GitHub Actions** (CI/CD - à venir)
-
----
-
-## 📊 DONNÉES & APIs
-
-### **Sources données**
-- 📡 **Capteurs IoT** : MQTT temps réel
-- 🛰️ **Sentinel-2** : Images satellites européennes
-- 🌊 **Copernicus Marine** : Données océanographiques
-- 📏 **OMS** : Seuils qualité eau officiels
-
-### **Formats supportés**
-- **JSON** (APIs REST)
-- **GeoJSON** (Données géospatiales)  
-- **MQTT** (Messages capteurs)
-- **TIFF** (Images satellites)
-
----
-
-## 🗺️ ZONES PILOTES
-
-### **Régions surveillées**
-- 🏙️ **Casablanca** : Zone urbaine côtière
-- 🏞️ **Sebou** : Bassin fluvial  
-- 🌊 **Atlantique** : Façade maritime
-
-### **Paramètres surveillés**
-| Paramètre | Seuil OMS | Unité | Source |
-|-----------|-----------|-------|--------|
-| pH | 6.5 - 8.5 | - | Capteurs |
-| Turbidité | < 4.0 | NTU | Capteurs + Satellite |
-| Température | < 25.0 | °C | Capteurs |
-| Chlorophylle | Variable | mg/m³ | Satellite |
-| NDWI | 0.0 - 1.0 | - | Satellite |
-
----
-
-## 🔄 WORKFLOW DÉVELOPPEMENT
-
-### **Structure branches**
-```
-main (production)
-└── development (équipe)
-    ├── feature/infrastructure-hamza
-    ├── feature/stmodel-hamza  
-    ├── feature/capteurs-bilal
-    ├── feature/satellite-bilal
-    ├── feature/alertes-yassin
-    └── feature/api-sig-yassin
-```
-
-### **Conventions commit**
-```
-feat: Nouvelle fonctionnalité
-fix: Correction bug  
-docs: Documentation
-refactor: Refactoring code
-test: Tests
-```
-
----
-
-## 🐳 COMMANDES DOCKER ESSENTIELLES
-
-```powershell
-# Infrastructure seule
-docker compose up db_timescale minio_storage -d
-
-# Service individuel
-docker compose up service_capteurs
-docker compose up service_satellite
-docker compose up service_stmodel  
-docker compose up service_alertes
-docker compose up service_api_sig
-
-# Tous services
-docker compose up --build
-
-# Logs service spécifique
-docker compose logs -f service_capteurs
-
-# Arrêt propre
-docker compose down
-```
-
----
-
-## 📈 ROADMAP
-
-### **Phase 1 - MVP** ✅ 
-- [x] Infrastructure Docker
-- [x] Structure microservices
-- [x] Configuration environnement
-
-### **Phase 2 - Services de base** 🔄
-- [ ] APIs REST pour chaque service
-- [ ] Intégration base données
-- [ ] Collecte données capteurs mock
-
-### **Phase 3 - Intégrations** 📋
-- [ ] MQTT temps réel  
-- [ ] APIs satellites
-- [ ] Modèles ML de base
-- [ ] Système alertes email
-
-### **Phase 4 - Interface** 📋
-- [ ] Carte interactive
-- [ ] Dashboard monitoring
-- [ ] Notifications temps réel
-
-### **Phase 5 - Production** 📋
-- [ ] Déploiement cloud
-- [ ] Monitoring avancé
-- [ ] Documentation utilisateur
-- [ ] Publication SoftwareX
-
----
-
-## 🤝 CONTRIBUTION
-
-### **Développeurs**
-- **Hamza Aglagal** - Architecture & ML
-- **Bilal** - IoT & Données satellites  
-- **Yassin** - Alertes & Cartographie
-
-### **Pour contribuer**
-1. 🍴 Fork le projet
-2. 🌿 Créer une branche feature
-3. 💾 Commiter vos changements  
-4. 📤 Push vers la branche
-5. 🔀 Créer une Pull Request
-
----
-
-## 📞 SUPPORT
-
-### **Documentation**
-- 📚 Guides développeur dans `/docs`
-- 🐳 Configuration Docker dans `/docker-compose.yml`
-- ⚙️ Variables environnement dans `.env.template`
-
-### **Issues**
-- 🐛 **Bugs** : Créer une issue GitHub
-- 💡 **Fonctionnalités** : Discussion équipe d'abord
-- ❓ **Questions** : Voir guides spécialisés
-
----
-
-## 📄 LICENCE
-
-Ce projet est sous licence **MIT** - voir [LICENSE](LICENSE) pour détails.
-
----
-
-## 🌟 ACKNOWLEDGMENTS
-
-- **OMS** pour standards qualité eau
-- **ESA** pour données Sentinel-2
-- **Copernicus** pour données marines
-- **EMSI** pour encadrement académique
-
----
-
-**🌊 AquaWatch-MS - Pour une eau plus propre, des décisions plus éclairées ! 🌊**
+[MIT](LICENSE)
